@@ -1,0 +1,18 @@
+# Efemérides Swiss Ephemeris: ~2 MB de binarios, se bajan con setup.sh
+ephe/*.se1
+
+# Salidas DERIVADAS: regenerables de forma determinista con los motores.
+data/carta_natal.json
+data/tradiciones.json
+data/transitos_*.json
+
+# NO se ignoran (y es deliberado):
+#   data/registro.jsonl        -> historial de predicciones: NO regenerable
+#   data/sorteos_log.jsonl     -> sorteos sellados: NO regenerable
+#   data/pesos_disciplinas.json-> pesos aprendidos
+#   hermes/hermes.json         -> memoria ejecutiva
+# Son la memoria persistente del sistema. El contenedor es efímero;
+# si no se commitean, se pierden al cerrar la sesión.
+
+__pycache__/
+*.pyc
