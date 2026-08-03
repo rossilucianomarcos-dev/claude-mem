@@ -9,6 +9,18 @@ Este documento define **cómo trabaja el sistema** y, sobre todo, **qué no
 está autorizado a hacer**. Si alguna vez una respuesta del oráculo contradice
 lo que está acá, el error está en la respuesta.
 
+> [!important] Son dos sistemas, no uno
+> **`oraculo`** (simbólico) — astrología, tarot, numerología, I Ching.
+> Capa B. Se ejecuta **solo bajo pedido explícito**.
+>
+> **`oraculo-estrategico`** (racional) — 15 marcos de análisis de decisiones.
+> Capa A/C. Se activa **automáticamente** ante cualquier decisión o consejo.
+> Protocolo en [[../Decisiones/Protocolo Estratégico]].
+>
+> Comparten Hermes y el vault. **No se mezclan en la salida.** Una
+> recomendación estratégica nunca se funda en un tránsito planetario; si se
+> quiere la lectura simbólica de una decisión, va aparte y claramente marcada.
+
 ---
 
 ## 1. Las tres capas de información

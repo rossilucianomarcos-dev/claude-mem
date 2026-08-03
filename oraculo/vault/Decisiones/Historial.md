@@ -7,6 +7,14 @@ tipo: decisiones
 Registra decisiones **importantes**, su fundamento y su resultado real. Es lo
 que permite, con el tiempo, distinguir buen criterio de buena suerte.
 
+> **Fuente de verdad: `data/decisiones.jsonl`.** Esta nota es la vista legible.
+> El protocolo completo está en [[Protocolo Estratégico]].
+>
+> ```bash
+> python3 engine/decisiones.py pendientes   # revisiones vencidas
+> python3 engine/decisiones.py aprender     # calibración y patrones
+> ```
+
 > Una decisión puede ser correcta y salir mal. La calidad de la decisión se
 > juzga por lo que se sabía **en el momento de tomarla**, no por el resultado.
 > Ambas columnas se registran por separado a propósito.
@@ -33,4 +41,4 @@ que permite, con el tiempo, distinguir buen criterio de buena suerte.
 
 *(vacío)*
 
-[[../Predicciones/Seguimiento]] · [[../Patrones/Detectados]]
+[[Protocolo Estratégico]] · [[../Predicciones/Seguimiento]] · [[../Patrones/Detectados]]

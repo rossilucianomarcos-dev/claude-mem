@@ -2,19 +2,59 @@
   "meta": {
     "sujeto": "Luciano Marcos Rossi",
     "creado": "2026-08-03T02:48:38.152022-03:00",
-    "actualizado": null,
+    "actualizado": "2026-08-03T09:01:16.188569-03:00",
     "version": 1,
     "proposito": "Memoria ejecutiva: estado actual, no conocimiento estable. El conocimiento estable vive en el vault de Obsidian."
   },
-  "contexto_reciente": [],
+  "contexto_reciente": [
+    {
+      "fecha": "2026-08-03T09:01:16.188518-03:00",
+      "texto": "2026-08-03: se implementó el Modo Oráculo Estratégico. Dos sistemas separados que comparten memoria: 'oraculo' (simbólico, bajo pedido) y 'oraculo-estrategico' (racional, automático ante decisiones y consejos)."
+    }
+  ],
   "objetivos": [],
   "proyectos": [],
   "prioridades": [],
   "agenda": [],
   "problemas": [],
   "decisiones": [],
-  "restricciones": [],
+  "restricciones": [
+    {
+      "id": 1,
+      "texto": "MODO ORÁCULO ESTRATÉGICO SIEMPRE ACTIVO: ante cualquier decisión o pedido de consejo, aplicar los 15 marcos de análisis antes de responder. Nunca responder por intuición. Si la mejor respuesta contradice la idea inicial de Luciano, decirlo primero y claramente. Registrar la decisión con decisiones.py. Ver .claude/skills/oraculo-estrategico/",
+      "creado": "2026-08-03T09:01:16.077171-03:00",
+      "estado": "activo",
+      "etiquetas": [
+        "sistema",
+        "permanente",
+        "decisiones"
+      ],
+      "prioridad": "alta"
+    },
+    {
+      "id": 2,
+      "texto": "Antes de analizar una decisión nueva: revisar decisiones vencidas sin evaluar (decisiones.py pendientes) y consultar la calibración histórica (decisiones.py aprender). Si hay exceso de confianza documentado, bajar la confianza declarada y explicar por qué.",
+      "creado": "2026-08-03T09:01:16.152494-03:00",
+      "estado": "activo",
+      "etiquetas": [
+        "sistema",
+        "permanente"
+      ],
+      "prioridad": "alta"
+    }
+  ],
   "oportunidades": [],
   "ideas": [],
-  "aprendizajes": []
+  "aprendizajes": [
+    {
+      "id": 1,
+      "texto": "Una decisión se juzga por lo que se sabía AL TOMARLA, no por cómo salió. Buena decisión + mal resultado = mala suerte, no cambiar el proceso. Mala decisión + buen resultado = suerte disfrazada, SÍ cambiar el proceso.",
+      "creado": "2026-08-03T09:01:16.118062-03:00",
+      "estado": "activo",
+      "etiquetas": [
+        "metodologia",
+        "decisiones"
+      ]
+    }
+  ]
 }

@@ -20,10 +20,13 @@ Mapa de contenidos. Todo el vault cuelga de acá.
 - [[../Tradiciones/BaZi]] — BaZi, maya, feng shui, ayurveda, cábala, celta
 - [[../Tarot/Historial]]
 
+## Decisiones (Oráculo Estratégico)
+- [[../Decisiones/Protocolo Estratégico]] — **15 marcos, activación automática**
+- [[../Decisiones/Historial]] — registro de decisiones y resultados
+
 ## Aprendizaje
 - [[../Predicciones/Seguimiento]] — precisión medida
 - [[../Patrones/Detectados]] — qué se confirmó y qué se refutó
-- [[../Decisiones/Historial]]
 
 ## Registro personal
 - [[../Sueños/Diario]] · [[../Salud/Hábitos]]
@@ -45,4 +48,7 @@ Mapa de contenidos. Todo el vault cuelga de acá.
 | `python3 engine/sorteos.py tarot\|iching\|runas` | Sorteos con registro |
 | `python3 engine/hermes.py briefing` | **Memoria ejecutiva** |
 | `python3 engine/registro.py validar` | **Precisión medida** |
+| `python3 engine/decisiones.py nueva --archivo d.json` | Registrar una decisión |
+| `python3 engine/decisiones.py pendientes` | **Revisiones vencidas** |
+| `python3 engine/decisiones.py aprender` | **Calibración y sesgos recurrentes** |
 | `python3 engine/informe.py --markdown` | Dossier completo |

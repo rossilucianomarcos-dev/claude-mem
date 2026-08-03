@@ -1,11 +1,15 @@
 # Oráculo Personal — Luciano Marcos Rossi
 
-Sistema de asesoría simbólica con memoria persistente y **validación empírica
-de sus propias recomendaciones**.
+**Dos sistemas** con memoria compartida y validación empírica de sus propias
+recomendaciones.
 
-Integra astrología (occidental tradicional, moderna, helenística y védica),
-numerología, BaZi, calendario maya, tarot, I Ching, runas, cábala hermética,
-feng shui, ayurveda, psicología junguiana, estoicismo y filosofía.
+| Sistema | Qué es | Cuándo corre |
+|---|---|---|
+| **`oraculo`** | Simbólico: astrología (occidental, helenística, védica), numerología, BaZi, maya, tarot, I Ching, runas, cábala, feng shui, ayurveda | **Solo bajo pedido** |
+| **`oraculo-estrategico`** | Racional: 15 marcos de análisis de decisiones | **Automático** ante toda decisión o consejo |
+
+Comparten Hermes y el vault, pero **no se mezclan en la salida**. Una
+recomendación estratégica nunca se funda en un tránsito planetario.
 
 ---
 
@@ -42,14 +46,24 @@ versionadas). Verifica que el Ascendente calculado sea el correcto.
 ```bash
 cd oraculo/engine
 
+# Simbólico (bajo pedido)
 python3 informe.py --markdown          # dossier del día
 python3 informe.py --completo          # + carta natal y tradiciones
-python3 hermes.py briefing             # memoria ejecutiva
 python3 registro.py validar            # precisión medida hasta ahora
 python3 sorteos.py iching --pregunta "..."
+
+# Estratégico (activación automática)
+python3 decisiones.py plantilla > /tmp/d.json
+python3 decisiones.py nueva --archivo /tmp/d.json
+python3 decisiones.py pendientes       # revisiones vencidas
+python3 decisiones.py aprender         # calibración y sesgos recurrentes
+
+# Compartido
+python3 hermes.py briefing             # memoria ejecutiva
 ```
 
-**No genera informes diarios automáticos.** Se ejecuta solo cuando se lo pide.
+**El oráculo simbólico no genera informes diarios automáticos.** El modo
+estratégico sí se activa solo, ante cualquier decisión o pedido de consejo.
 
 ---
 
@@ -63,7 +77,9 @@ oraculo/
 │   ├── numerologia.py     pitagórico + caldeo, ciclos personales
 │   ├── tradiciones.py     BaZi, maya, celta, cábala, feng shui, ayurveda
 │   ├── sorteos.py         tarot, I Ching, runas — con registro sellado
-│   ├── registro.py        MOTOR DE VALIDACIÓN
+│   ├── registro.py        MOTOR DE VALIDACIÓN (predicciones simbólicas)
+│   ├── decisiones.py      MOTOR DE DECISIONES (15 marcos, calibración)
+│   ├── verificar_hora.py  auditoría de la hora de nacimiento
 │   ├── hermes.py          memoria ejecutiva
 │   └── informe.py         compositor de dossiers
 ├── vault/             # Obsidian — conocimiento estable, notas enlazadas
@@ -152,6 +168,33 @@ Alerta automáticamente sobre: N insuficiente, sesgo de supervivencia
 
 ---
 
+## Motor de decisiones
+
+El modo estratégico registra cada decisión **antes** de conocerse el resultado
+y la compara después. Sin eso, el sesgo retrospectivo hace que meses más tarde
+uno crea que "ya sabía" lo que iba a pasar.
+
+```bash
+python3 decisiones.py aprender
+```
+
+Mide cuatro cosas que sin registro son imposibles de saber:
+
+- **Calibración** — ¿"confianza alta" acierta más que "media"? Si no, el nivel
+  de confianza declarado no informa nada, y el sistema lo dice.
+- **Detección de riesgos** — de los riesgos que ocurrieron, ¿cuántos estaban
+  en la lista previa? Esa tasa mide si el análisis sirve o es decorativo.
+- **Sesgos recurrentes** — confirmado 3+ veces es patrón personal, no azar.
+- **Decisión vs. resultado** — una buena decisión con mal resultado es mala
+  suerte (no cambiar el proceso); una mala con buen resultado es suerte
+  disfrazada (sí cambiarlo).
+
+El motor **rechaza** registros con una sola opción, sin resultado esperado,
+sin métricas o sin riesgos. Con menos de 5 decisiones revisadas avisa que no
+concluye nada; con cero, se niega.
+
+---
+
 ## Límites
 
 No predice el futuro. No sustituye médico, abogado, contador ni terapeuta.
@@ -167,4 +210,6 @@ El objetivo declarado es **pensar mejor**, no saber qué va a pasar.
 - `vault/Sistema/Metodología.md` — reglas epistémicas completas
 - `vault/Sistema/Índice.md` — mapa del vault
 - `vault/Astrología/Carta Natal.md` — análisis natal completo
-- `.claude/skills/oraculo/SKILL.md` — protocolo operativo del agente
+- `vault/Decisiones/Protocolo Estratégico.md` — los 15 marcos y el formato
+- `skill/SKILL.md` · `skill/SKILL-estrategico.md` — protocolos del agente
+- `skill/referencias/marcos-de-analisis.md` — marcos en detalle, con modos de fallo

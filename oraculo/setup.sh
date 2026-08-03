@@ -18,13 +18,17 @@ for f in sepl_18.se1 semo_18.se1 seas_18.se1; do
   fi
 done
 
-echo "==> Instalando la skill de Claude Code"
+echo "==> Instalando las skills de Claude Code"
 # El repositorio ignora .claude/skills/ por convención propia, así que la
 # fuente versionada vive en oraculo/skill/ y desde acá se instala.
-SKILLDIR="../.claude/skills/oraculo"
-mkdir -p "$SKILLDIR"
-cp skill/SKILL.md "$SKILLDIR/SKILL.md"
-echo "    instalada en .claude/skills/oraculo/"
+mkdir -p ../.claude/skills/oraculo
+cp skill/SKILL.md ../.claude/skills/oraculo/SKILL.md
+echo "    oraculo              (simbólico, bajo pedido)"
+
+mkdir -p ../.claude/skills/oraculo-estrategico/referencias
+cp skill/SKILL-estrategico.md ../.claude/skills/oraculo-estrategico/SKILL.md
+cp skill/referencias/marcos-de-analisis.md ../.claude/skills/oraculo-estrategico/referencias/
+echo "    oraculo-estrategico  (racional, activación automática)"
 
 echo "==> Verificación"
 cd engine && python3 - << 'PY'
