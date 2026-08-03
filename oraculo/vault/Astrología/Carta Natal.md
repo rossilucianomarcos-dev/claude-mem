@@ -44,14 +44,26 @@ ultima_verificacion: 2026-08-03
 > 4 de marzo de 1990.** El 9 de enero de 1990 el país estaba en **UTC−2**,
 > no en el habitual UTC−3.
 >
-> Esto no es un detalle. Una hora de diferencia mueve el Ascendente unos
-> **15 grados**. Con UTC−3, el Ascendente daría ~19° Capricornio y Venus no
-> estaría conjunta al Ascendente. Con el offset correcto, el Ascendente es
-> 4°05′ Acuario y Venus está a **once minutos de arco** de él.
+> Esto no es un detalle. Comparación calculada de ambos escenarios:
 >
-> La diferencia cambia el eje entero de la carta. Verificado contra la base
-> de datos IANA (`America/Argentina/Cordoba`), que es la fuente autoritativa
-> de husos históricos.
+> | | UTC−2 (correcto) | UTC−3 (incorrecto) |
+> |---|---|---|
+> | Ascendente | 04°05′12″ Acuario | 16°39′20″ Acuario |
+> | **Medio Cielo** | **25°53′08″ Libra** | **11°28′24″ Escorpio** |
+> | Venus respecto del ASC | **11′ de arco** (conjunción) | 12°46′ (sin conjunción) |
+> | Júpiter | casa 6 | casa 5 |
+> | Saturno · Urano · Neptuno | casa 12 | casa 11 |
+>
+> El Ascendente se corre **12°34′** (no cambia de signo). Pero el **Medio
+> Cielo sí cambia de signo**, lo que traslada el regente de la carrera de
+> Venus a Marte/Plutón. Y **4 de 10 planetas cambian de casa**: el cúmulo de
+> Capricornio dejaría de estar íntegro en casa 12 para repartirse entre la 11
+> y la 12, desarmando el rasgo estructural dominante descrito en §3.
+>
+> Verificado contra la base IANA (`America/Argentina/Cordoba`), fuente
+> autoritativa de husos históricos. Transiciones relevantes:
+> DST desde el **15-oct-1989 03:00 UTC** (`isdst=1`, `gmtoff=−7200`) hasta el
+> **4-mar-1990 02:00 UTC**. El 9-ene-1990 cae dentro de esa ventana.
 
 ---
 

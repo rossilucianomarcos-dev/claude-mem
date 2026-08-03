@@ -145,7 +145,8 @@ Cuando pida "el informe" o "la consulta del día":
 | Kua | 2 (grupo Oeste) |
 
 Tres errores frecuentes que este sistema ya corrige — **no reintroducirlos**:
-- Usar UTC−3 (mueve el ASC ~15°)
+- Usar UTC−3 (corre el ASC 12°34′, mueve el MC de Libra a Escorpio
+  y cambia de casa a 4 de 10 planetas)
 - Año chino 1990 Caballo de Metal (es 1989 Serpiente de Tierra)
 - Kua 1 (es Kua 2 — invierte todas las direcciones)
 

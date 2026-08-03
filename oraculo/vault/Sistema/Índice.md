@@ -37,6 +37,7 @@ Mapa de contenidos. Todo el vault cuelga de acá.
 
 | Comando | Qué hace |
 |---|---|
+| `python3 engine/verificar_hora.py` | **Auditoría de la hora de nacimiento** |
 | `python3 engine/natal.py` | Carta natal completa |
 | `python3 engine/transitos.py --ciclos` | Tránsitos, progresiones, ciclos |
 | `python3 engine/numerologia.py` | Perfil y ciclos numerológicos |

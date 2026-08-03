@@ -100,9 +100,14 @@ miraría solo. Eso no requiere que la astrología sea verdadera.
 Errores frecuentes en calculadoras online, ya corregidos acá:
 
 **1. Horario de verano argentino.** Argentina observó DST del 15-oct-1989 al
-4-mar-1990. El 9-ene-1990 el offset real fue **UTC−2**, no UTC−3. Usar UTC−3
-desplaza el Ascendente **~15°** y elimina la conjunción Venus–Ascendente (que
-es de 11 minutos de arco). Verificado contra tzdata IANA.
+4-mar-1990. El 9-ene-1990 el offset real fue **UTC−2**, no UTC−3.
+
+Usar UTC−3 desplazaría el Ascendente **12°34′**, movería el **Medio Cielo de
+Libra a Escorpio** (cambiando el regente de la carrera de Venus a Marte/Plutón),
+cambiaría de casa a **4 de 10 planetas** y eliminaría la conjunción
+Venus–Ascendente, que es de apenas 11 minutos de arco.
+
+Verificado contra tzdata IANA: `isdst=1`, `gmtoff=-7200` en esa fecha.
 
 **2. Año BaZi.** Nacido antes de Lì Chūn (4-feb-1990), el año chino es
 **1989 己巳 Serpiente de Tierra**, no 1990 Caballo de Metal.
