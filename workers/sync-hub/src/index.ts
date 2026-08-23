@@ -812,8 +812,9 @@ function decimalAtLeast(left: string, right: string): boolean {
 }
 
 async function handleRepairDrain(request: Request, env: Env): Promise<Response> {
-	const expected = `Bearer ${env.CMEM_INTERNAL_PROJECTOR_SECRET ?? ""}`;
-	if (!env.CMEM_INTERNAL_PROJECTOR_SECRET || request.headers.get("Authorization") !== expected) {
+	// Through the shared helper, like the other three /internal routes: one
+	// implementation to harden, so tightening it cannot leave this route behind.
+	if (!hasInternalCredential(request, env)) {
 		return errorResponse(401, "invalid internal projector credential");
 	}
 	let body: unknown;

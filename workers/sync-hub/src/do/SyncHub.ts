@@ -29,6 +29,8 @@ export const MAX_DEVICES_PER_USER = 64;
 export const DEVICE_LIMIT_ERROR = "device_limit_exceeded";
 /** 45s Hub abort < 60s Pro platform ceiling < 90s fencing lease. */
 export const PROJECTION_LEASE_MS = 90_000;
+/** meta key holding the user id this hub is bound to (see bindUserId). */
+const USER_ID_META_KEY = "user_id";
 const encoder = new TextEncoder();
 
 export type PushOp = CanonicalWireOp;
@@ -573,7 +575,7 @@ export class SyncHub extends DurableObject<Env> {
 	}
 
 	getMetadata(userId: string): HubMetadata {
-		if (typeof userId !== "string" || userId.length === 0) throw invalid("user_id must be non-empty");
+		this.bindUserId(userId, invalid);
 		const head = this.headSeq();
 		const projected = this.projectedSeq();
 		const connected = new Set<string>();
@@ -674,7 +676,7 @@ export class SyncHub extends DurableObject<Env> {
 		now = Date.now(),
 	): ProjectionPage {
 		this.assertLease(leaseToken, now);
-		if (typeof userId !== "string" || userId.length === 0) throw projectionError("user_id must be non-empty");
+		this.bindUserId(userId, projectionError);
 		const target = assertCanonicalDecimal(targetSeq);
 		const projected = this.projectedSeq();
 		const epoch = this.meta("epoch");
@@ -857,6 +859,33 @@ export class SyncHub extends DurableObject<Env> {
 			throw invalid("deviceId must be 1-128 characters");
 		}
 		return normalizedId;
+	}
+
+	/**
+	 * Bind this object to one user id, trust-on-first-use.
+	 *
+	 * Routing already guarantees the mapping: the front Worker addresses the
+	 * hub with `getByName(userId)` using the id it verified against the token's
+	 * canonical owner. But methods that also RECEIVE a user id previously only
+	 * checked it was non-empty and echoed it back, so the invariant lived in
+	 * the caller. A future refactor that addressed one hub and named another
+	 * would return this hub's data labelled with the other id, silently.
+	 *
+	 * The pin makes the object enforce it itself. It is established lazily
+	 * because the write path cannot set it: pushOps takes no user id — the DO
+	 * name IS the user id — so only the methods below ever learn it. Hubs
+	 * created before this change therefore pin on their next such call, and
+	 * resetAllState()'s deleteAll() clears the pin along with the data, which
+	 * is correct: a wiped hub is re-bound by whoever addresses it next.
+	 */
+	private bindUserId(userId: string, fail: (message: string) => Error): void {
+		if (typeof userId !== "string" || userId.length === 0) throw fail("user_id must be non-empty");
+		const pinned = this.metaOptional(USER_ID_META_KEY);
+		if (pinned === null) {
+			this.setMeta(USER_ID_META_KEY, userId);
+			return;
+		}
+		if (pinned !== userId) throw fail("user_id does not match this hub's bound identity");
 	}
 
 	private meta(key: string): string {
