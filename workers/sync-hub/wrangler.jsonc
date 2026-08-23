@@ -23,6 +23,27 @@
 			}
 		]
 	},
+	// Pre-auth request ceiling, keyed by client IP (src/index.ts). The finding it
+	// closes: a positive-only verdict cache means every request carrying a BAD
+	// token reaches TOKEN_VERIFY_URL, so anyone with no credentials at all could
+	// turn each of their requests into one request against cmem.ai. Keying on IP
+	// rather than the token or X-User-Id is deliberate — both are attacker-chosen
+	// and rotatable, the IP is not.
+	//
+	// 120/min per IP: the client is event-driven with backoff (CloudSync
+	// backoffMaxMs 600s) and batches up to 500 ops per push, so a busy single
+	// device is a handful of requests per minute. The headroom is for several
+	// devices sharing one NAT. `period` accepts only 10 or 60.
+	//
+	// namespace_id is an account-wide identifier for this counter; it must not
+	// collide with another rate limiter in the same Cloudflare account.
+	"ratelimits": [
+		{
+			"name": "SYNC_RATE_LIMITER",
+			"namespace_id": "1001",
+			"simple": { "limit": 120, "period": 60 }
+		}
+	],
 	"kv_namespaces": [
 		{
 			"binding": "AUTH_CACHE",

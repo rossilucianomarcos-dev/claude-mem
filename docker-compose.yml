@@ -122,6 +122,28 @@ services:
       # The HTTP service does not consume BullMQ jobs; the worker container
       # does. This split keeps HTTP latency unaffected by provider calls.
       CLAUDE_MEM_GENERATION_DISABLED: "true"
+      # --- Cost ceiling (docs/api.md) ---------------------------------------
+      # These guards run after auth on every /v1 route, in the order
+      # limit -> quota -> meter, and are opt-in: unset means no ceiling at all.
+      # A deployment that only satisfies the required-env table therefore boots
+      # with none, while POST /v1/events drives provider generation — real
+      # spend. A default is set here so the deployable stack is bounded out of
+      # the box; every value is overridable from the host env.
+      #
+      # Requests per API KEY per minute. 300 (5/s) leaves an interactive client
+      # and a syncing agent plenty of headroom while bounding a runaway loop.
+      CLAUDE_MEM_RATE_LIMIT_PER_MIN: ${CLAUDE_MEM_RATE_LIMIT_PER_MIN:-300}
+      # Records one usage row per authenticated call. On by default: it is what
+      # GET /v1/usage reports, and the monthly caps below are meaningless
+      # without it.
+      CLAUDE_MEM_USAGE_METERING: ${CLAUDE_MEM_USAGE_METERING:-1}
+      # Monthly caps per TEAM. Left empty deliberately: these are billing policy,
+      # not a security default — the right number depends on the plan being
+      # sold, and a wrong one silently 402s paying customers. Set them per
+      # deployment. Requests -> 402 quota_exceeded; tokens gate WRITES only, so
+      # a team over budget can still recall what it already stored.
+      CLAUDE_MEM_MONTHLY_REQUEST_CAP: ${CLAUDE_MEM_MONTHLY_REQUEST_CAP:-}
+      CLAUDE_MEM_MONTHLY_TOKEN_CAP: ${CLAUDE_MEM_MONTHLY_TOKEN_CAP:-}
     ports:
       - "37877:37877"
     volumes:

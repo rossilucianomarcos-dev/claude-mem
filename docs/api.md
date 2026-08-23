@@ -32,8 +32,17 @@ When `CLAUDE_MEM_AUTH_MODE=api-key`, send `Authorization: Bearer <key>`. Read en
 
 ## Rate limiting, quota, and usage metering
 
-These paid-readiness guards run after auth and are **opt-in via env** — unset (the
-default) means no rate limit, no quota, and no metering, so behavior is unchanged.
+These guards run after auth, in the order limit → quota → meter, so a request is
+counted only once it has been admitted. Each is enabled by its env var; unset
+means that guard does not run.
+
+`docker-compose.yml` sets a default ceiling for the deployable stack —
+`CLAUDE_MEM_RATE_LIMIT_PER_MIN=300` and `CLAUDE_MEM_USAGE_METERING=1` — because
+a deployment that satisfies only the required-env table would otherwise boot
+with no ceiling at all while `POST /v1/events` drives provider generation. The
+monthly caps ship empty: they are billing policy rather than a security
+default, and a wrong number silently `402`s paying teams. Running the server
+outside that compose file leaves every guard off unless you set them.
 
 - `CLAUDE_MEM_RATE_LIMIT_PER_MIN` — max requests per API key per minute. Over the
   limit returns `429` with `Retry-After` (and `X-RateLimit-*` headers). Fail-open.

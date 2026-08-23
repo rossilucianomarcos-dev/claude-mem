@@ -139,10 +139,17 @@ part of the devex work still ahead.
 
 ## Paid-readiness: rate limiting, quotas, metering
 
-These guards run **after** auth and are **opt-in via environment variables**. Unset
-(the default) means no rate limit, no quota, and no metering — behavior is
-identical to a server without them. Every guard **fails open**: a backing-store
-error never blocks a legitimate request.
+These guards run **after** auth, in the order limit → quota → meter, so a request
+is counted only once it has been admitted. Each is enabled by its env var; unset
+means that guard does not run. Every guard **fails open**: a backing-store error
+never blocks a legitimate request.
+
+The bundled `docker-compose.yml` sets `CLAUDE_MEM_RATE_LIMIT_PER_MIN=300` and
+`CLAUDE_MEM_USAGE_METERING=1` so the deployable stack is bounded out of the box —
+without them a server that satisfies only the required-env table has no ceiling
+while `POST /v1/events` drives provider generation. The monthly caps ship empty
+because they are billing policy, not a security default. Running the server
+outside that compose file leaves every guard off unless you set them.
 
 | Env var | Effect | Response when exceeded |
 |---------|--------|------------------------|
