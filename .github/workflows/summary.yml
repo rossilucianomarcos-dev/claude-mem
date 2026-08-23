@@ -4,31 +4,70 @@ on:
   issues:
     types: [opened]
 
+# Deny by default; the job below opts into exactly what it needs.
+permissions: {}
+
 jobs:
   summary:
     runs-on: ubuntu-latest
     permissions:
-      issues: write
-      models: read
-      contents: read
+      issues: write   # posting the summary comment
+      models: read    # actions/ai-inference
+      contents: read  # checkout, for the prompt template
 
     steps:
+      # Pinned to immutable SHA digests; the trailing comment records the
+      # release each digest corresponds to.
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      # The issue title and body are attacker-controlled: anyone can open an
+      # issue. Interpolating them into the model `prompt:` let a crafted issue
+      # rewrite the instructions for a job that holds issues: write.
+      #
+      # They are staged to files through `env:`, which is the only place a
+      # ${{ }} expression is safe for untrusted text — the value is passed to
+      # the process rather than pasted into the script. The model then reads
+      # them via `file_input`, so the content never crosses the expression
+      # layer at all.
+      #
+      # The caps bound cost and context on a public repo, where issue bodies
+      # are unbounded. They truncate the input to the model only; the issue
+      # itself is untouched.
+      - name: Stage untrusted issue content
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/issue"
+          printf '%s' "$ISSUE_TITLE" | head -c 2000  > "$RUNNER_TEMP/issue/title.txt"
+          printf '%s' "$ISSUE_BODY"  | head -c 20000 > "$RUNNER_TEMP/issue/body.txt"
 
       - name: Run AI inference
         id: inference
-        uses: actions/ai-inference@v2
+        uses: actions/ai-inference@a7805884c80886efc241e94a5351df715968a0ad # v2.1.1
         with:
-          prompt: |
-            Summarize the following GitHub issue in one paragraph:
-            Title: ${{ github.event.issue.title }}
-            Body: ${{ github.event.issue.body }}
+          prompt-file: .github/prompts/summarize-issue.prompt.yml
+          file_input: |
+            title: ${{ runner.temp }}/issue/title.txt
+            body: ${{ runner.temp }}/issue/body.txt
+          max-completion-tokens: '400'
 
+      # RESPONSE is model output derived from untrusted input, so it stays in
+      # an env var rather than the script body. The header marks the comment as
+      # machine-generated so a summary that echoes attacker text is not read as
+      # a maintainer statement.
       - name: Comment with AI summary
-        run: |
-          gh issue comment "$ISSUE_NUMBER" --body "$RESPONSE"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           RESPONSE: ${{ steps.inference.outputs.response }}
+        run: |
+          if [ -z "${RESPONSE//[[:space:]]/}" ]; then
+            echo "::notice::Model returned an empty summary; nothing to post."
+            exit 0
+          fi
+          printf '%s\n\n%s\n' \
+            "🤖 _Automated summary of this issue. Generated from user-submitted content — treat it as a reading aid, not as a maintainer's assessment._" \
+            "$RESPONSE" > "$RUNNER_TEMP/comment.md"
+          gh issue comment "$ISSUE_NUMBER" --body-file "$RUNNER_TEMP/comment.md"
