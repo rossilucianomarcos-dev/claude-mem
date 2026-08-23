@@ -51,6 +51,27 @@ scans the stack and pulls in the right sub-skills itself.
 See `vault/design-skills/README.md` for the full inventory, pinned upstream
 commits, and how to update.
 
+## Security Skills
+
+24 skills de ciberseguridad vendorizadas en `vault/security-skills/` (fuente de
+verdad, commiteada) más la orquestadora propia `security-audit`. Se instalan en
+`.claude/skills/` con `vault/security-skills/install.sh` — ese directorio está
+gitignorado, así que hay que re-correr el script tras un clone fresco.
+
+Para una revisión de seguridad del proyecto: **`/security-audit`**. Cubre
+ingesta de contenido no confiable (transcripts y output de herramientas),
+superficie MCP, server/SQLite/Chroma, cadena de suministro npm, y CI/CD.
+
+Para revisar solo el diff pendiente de la branch está la skill incorporada
+`/security-review`, que es más rápida y acotada.
+
+Los `scripts/*.py` de las skills son opcionales; se corren con
+`vault/security-skills/run-script.sh <skill> <script.py>`, que resuelve deps con
+`uv` sin instalar nada global.
+
+Ver `vault/security-skills/README.md` para procedencia, la revisión de seguridad
+del upstream y cómo actualizar.
+
 ## Important
 
 No need to edit the changelog ever, it's generated automatically.
