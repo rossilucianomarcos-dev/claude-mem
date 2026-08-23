@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 import { logger } from '../../src/utils/logger.js';
 import { Server, type ServerOptions } from '../../src/services/server/Server.js';
 import { ServerViewerRoutes } from '../../src/server/runtime/ServerViewerRoutes.js';
+import { VIEWER_CONTENT_SECURITY_POLICY } from '../../src/shared/viewer-security-headers.js';
 
 function baseOptions(): ServerOptions {
   return {
@@ -75,5 +76,65 @@ describe('ServerViewerRoutes on the server runtime (#2552)', () => {
       const body = await rootRes.json();
       expect(body.error).toBe('ViewerUnavailable');
     }
+  });
+
+  // The viewer renders observation text that began life as untrusted tool
+  // output. Its raw-HTML sink is sanitized twice over (ansi-to-html escapeXML
+  // + a DOMPurify span/div/br allowlist); these headers are the layer behind
+  // that, so a future sanitizer bypass or a new sink is not immediately fatal.
+  it('sends the viewer security headers on the document and on static assets', async () => {
+    spies = [
+      spyOn(logger, 'info').mockImplementation(() => {}),
+      spyOn(logger, 'warn').mockImplementation(() => {}),
+    ];
+    server = new Server(baseOptions());
+    server.registerRoutes(new ServerViewerRoutes());
+    server.finalizeRoutes();
+
+    const port = 42000 + Math.floor(Math.random() * 9000);
+    await server.listen(port, '127.0.0.1');
+
+    const expectHeaders = (res: Response) => {
+      expect(res.headers.get('content-security-policy')).toBe(VIEWER_CONTENT_SECURITY_POLICY);
+      expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+      expect(res.headers.get('x-frame-options')).toBe('DENY');
+      expect(res.headers.get('referrer-policy')).toBe('no-referrer');
+    };
+
+    expectHeaders(await fetch(`http://127.0.0.1:${port}/`));
+
+    // Static assets get them too: without nosniff a browser may content-sniff
+    // the bundle or an SVG into something else.
+    const asset = await fetch(`http://127.0.0.1:${port}/viewer-bundle.js`);
+    if (asset.status === 200) expectHeaders(asset);
+  });
+
+  // Each directive below is load-bearing for something the viewer actually
+  // loads. Asserting them individually makes an accidental loosening — most of
+  // all script-src — fail here rather than silently ship.
+  it('locks scripts to the origin and denies everything not explicitly needed', () => {
+    const directives = new Map(
+      VIEWER_CONTENT_SECURITY_POLICY.split('; ').map(d => {
+        const [name, ...rest] = d.split(' ');
+        return [name, rest.join(' ')];
+      }),
+    );
+
+    expect(directives.get('default-src')).toBe("'none'");
+    // No 'unsafe-inline' and no 'unsafe-eval' here: the bundle is a same-origin
+    // <script src> built with minify + iife + sourcemap:false, so it needs neither.
+    expect(directives.get('script-src')).toBe("'self'");
+    expect(directives.get('object-src')).toBe("'none'");
+    expect(directives.get('base-uri')).toBe("'none'");
+    expect(directives.get('frame-ancestors')).toBe("'none'");
+    // GitHubStarsButton fetches the star count; dropping this breaks it.
+    expect(directives.get('connect-src')).toContain('https://api.github.com');
+    // The template carries one inline <style> block and the components set
+    // style={{...}} props, so style-src needs 'unsafe-inline'. That is the one
+    // concession in the policy and it is deliberate — CSS-only injection is a
+    // far narrower problem than script execution.
+    expect(directives.get('style-src')).toContain("'unsafe-inline'");
+    expect(directives.get('font-src')).toBe("'self'");
+    expect(directives.get('img-src')).toBe("'self' data:");
   });
 });

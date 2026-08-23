@@ -2,6 +2,7 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
 import { readFileSync, existsSync } from 'fs';
+import { applyViewerSecurityHeaders } from '../../../../shared/viewer-security-headers.js';
 import { logger } from '../../../../utils/logger.js';
 import { getPackageRoot } from '../../../../shared/paths.js';
 import { SSEBroadcaster } from '../../SSEBroadcaster.js';
@@ -46,7 +47,8 @@ export class ViewerRoutes extends BaseRouteHandler {
 
   setupRoutes(app: express.Application): void {
     const packageRoot = getPackageRoot();
-    app.use(express.static(path.join(packageRoot, 'ui')));
+    // Same headers on the assets as on the document — see viewer-security-headers.ts.
+    app.use(express.static(path.join(packageRoot, 'ui'), { setHeaders: applyViewerSecurityHeaders }));
 
     app.get('/health', this.handleHealth.bind(this));
     app.get('/', this.handleViewerUI.bind(this));
@@ -64,6 +66,8 @@ export class ViewerRoutes extends BaseRouteHandler {
   });
 
   private handleViewerUI = this.wrapHandler((req: Request, res: Response): void => {
+    // Before the availability check, for the same reason as the server runtime.
+    applyViewerSecurityHeaders(res);
     if (!viewerHtmlBytes) {
       throw new Error('Viewer UI not found at any expected location');
     }

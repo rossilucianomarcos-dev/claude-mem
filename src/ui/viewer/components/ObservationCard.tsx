@@ -25,15 +25,44 @@ function stripProjectRoot(filePath: string): string {
   return parts.length > 3 ? parts.slice(-3).join('/') : filePath;
 }
 
+// facts/concepts/files_* are JSON arrays serialized into TEXT columns. The
+// write paths in storage always stringify an array, but the viewer also renders
+// rows that arrive from other sources — device sync, older schema versions,
+// manual DB edits — so a malformed or non-array value is possible here even
+// though the normal path cannot produce one.
+//
+// It matters because the ErrorBoundary wraps <App/> at the root (index.tsx), so
+// a throw in one card does not degrade that card: it replaces the entire viewer
+// with the "Something went wrong" screen. Returning [] keeps the rest of the
+// card — and every other card — rendering.
+//
+// Guards both failure modes: a parse error, and valid JSON that is not an array
+// of strings (`.map(stripProjectRoot)` would throw on those just the same).
+export function parseStringArray(raw: string | null | undefined, field: string): string[] {
+  if (!raw) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    console.warn(`ObservationCard: ${field} is not valid JSON; rendering it as empty.`);
+    return [];
+  }
+  if (!Array.isArray(parsed)) {
+    console.warn(`ObservationCard: ${field} parsed to ${typeof parsed}, expected an array; rendering it as empty.`);
+    return [];
+  }
+  return parsed.filter((item): item is string => typeof item === 'string');
+}
+
 export function ObservationCard({ observation }: ObservationCardProps) {
   const [showFacts, setShowFacts] = useState(false);
   const [showNarrative, setShowNarrative] = useState(false);
   const date = formatDate(observation.created_at_epoch);
 
-  const facts = observation.facts ? JSON.parse(observation.facts) : [];
-  const concepts = observation.concepts ? JSON.parse(observation.concepts) : [];
-  const filesRead = observation.files_read ? JSON.parse(observation.files_read).map(stripProjectRoot) : [];
-  const filesModified = observation.files_modified ? JSON.parse(observation.files_modified).map(stripProjectRoot) : [];
+  const facts = parseStringArray(observation.facts, 'facts');
+  const concepts = parseStringArray(observation.concepts, 'concepts');
+  const filesRead = parseStringArray(observation.files_read, 'files_read').map(stripProjectRoot);
+  const filesModified = parseStringArray(observation.files_modified, 'files_modified').map(stripProjectRoot);
 
   const hasFactsContent = facts.length > 0 || concepts.length > 0 || filesRead.length > 0 || filesModified.length > 0;
 
