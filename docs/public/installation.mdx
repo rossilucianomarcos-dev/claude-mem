@@ -42,10 +42,30 @@ Both methods will automatically configure hooks and start the worker service. St
 ## System Requirements
 
 - **Node.js**: 20.0.0 or higher
-- **Bun** ≥ 1.0 (auto-installed by `npx claude-mem install` if missing)
+- **Bun** ≥ 1.0 (auto-installed by `npx claude-mem install` if missing — see below)
 - **uv** (auto-installed if missing — provides Python for Chroma's embedding service)
 - **Claude Code** or another supported IDE (Cursor, Windsurf, OpenCode, Codex CLI, Antigravity CLI, OpenClaw)
 - **SQLite 3**: bundled via `bun:sqlite`
+
+### How Bun and uv get installed
+
+When either is missing, the installer tries your **package manager first** —
+`brew` on macOS/Linux, `winget` on Windows — because those verify what they
+install.
+
+Only if no package manager is available does it fall back to the vendor's own
+install script (`bun.sh`, `astral.sh`). That script is fetched and executed at
+install time with nothing to verify it against — the scripts roll with every
+upstream release, so there is no stable checksum to pin — which is why the
+fallback **asks first**:
+
+- **Interactive terminal**: you are shown the exact command and the host it
+  comes from, and you confirm or decline.
+- **Non-interactive** (CI, Docker builds, provisioning): the fallback is
+  refused, and the error names the manual install commands. To allow it in an
+  automated run, set `CLAUDE_MEM_ALLOW_REMOTE_RUNTIME_INSTALL=1`.
+
+Installing Bun and uv yourself beforehand skips all of this.
 
 ## Advanced Installation
 
