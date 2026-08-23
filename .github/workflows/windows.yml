@@ -11,6 +11,9 @@ on:
   push:
     branches: [main]
 
+# Deny by default; each job opts into exactly the scopes it needs.
+permissions: {}
+
 jobs:
   build:
     # Pinned to windows-2022 (VS2022 / v17). The windows-latest image moved to
@@ -18,11 +21,13 @@ jobs:
     # can't detect it ("unknown version undefined") and native tree-sitter
     # rebuilds fail during `npm install`. Revisit when node-gyp gains VS18 support.
     runs-on: windows-2022
+    permissions:
+      contents: read  # checkout only
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
 
