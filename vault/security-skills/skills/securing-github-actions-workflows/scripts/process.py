@@ -89,7 +89,11 @@ def check_permissions(workflow: dict, filepath: str) -> list:
             message="No top-level permissions defined. Inherits default (may be write-all).",
             remediation="Add 'permissions: {}' at workflow level and grant per-job."
         ))
-    elif top_perms == "write-all" or (isinstance(top_perms, dict) and
+    # PATCH LOCAL (divergencia con upstream): `all()` sobre un dict vacío
+    # devuelve True, así que `permissions: {}` — la remediación que este mismo
+    # script recomienda arriba — se reportaba como write-all. El `top_perms and`
+    # exige al menos una clave antes de evaluar.
+    elif top_perms == "write-all" or (isinstance(top_perms, dict) and top_perms and
                                        all(v == "write" for v in top_perms.values())):
         findings.append(SecurityFinding(
             file=filename, line=0,

@@ -104,3 +104,14 @@ done
 
 Revisá el diff antes de commitear, y regenerá `deps.txt` si cambiaron imports.
 `security-audit` es propia: no la pises.
+
+### Divergencias con upstream
+
+El bucle de arriba pisa las skills vendorizadas, así que estos parches locales
+se pierden al actualizar. Re-aplicalos:
+
+- `securing-github-actions-workflows/scripts/process.py` — la rama que detecta
+  `write-all` usaba `all()` sobre el dict de permisos. Como `all()` de un dict
+  vacío es `True`, `permissions: {}` (la remediación que el propio script
+  recomienda) se reportaba como HIGH write-all. El fix agrega `top_perms and`
+  antes del `all()`. Está marcado con `# PATCH LOCAL` en el archivo.
