@@ -10,6 +10,9 @@ on:
   pull_request_review:
     types: [submitted]
 
+# Deny by default; each job opts into exactly the scopes it needs.
+permissions: {}
+
 jobs:
   claude:
     if: |
@@ -26,13 +29,17 @@ jobs:
       actions: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 1
 
+      # Pinned like every other action here. Note the tradeoff: this one is
+      # published to move under its @v1 tag, so pinning means updates —
+      # including security fixes — now need a deliberate bump of this digest.
+      # v1 carries no patch-level tag, hence the bare version comment.
       - name: Run Claude Code
         id: claude
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 

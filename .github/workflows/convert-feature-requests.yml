@@ -10,6 +10,9 @@ on:
         required: true
         type: number
 
+# Deny by default; each job opts into exactly the scopes it needs.
+permissions: {}
+
 jobs:
   convert:
     runs-on: ubuntu-latest
@@ -25,7 +28,7 @@ jobs:
     steps:
       - name: Get issue details and create discussion
         id: discussion
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
           script: |
             // Get issue details
@@ -85,12 +88,22 @@ jobs:
               throw error;
             }
 
+      # Step outputs reach the script through `env:` rather than a ${{ }}
+      # expression. A ${{ }} inside `script:` is pasted into the JavaScript
+      # source before it is evaluated, so any quote or newline in the value
+      # would break out of the literal and run as code. These two values are
+      # GitHub-generated (an issue number and a discussion URL), so this is
+      # hardening rather than a live hole — but the pattern is the one that
+      # turns into an injection the moment a user-controlled value is wired in.
       - name: Comment on issue
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          ISSUE_NUMBER: ${{ steps.discussion.outputs.issue_number }}
+          DISCUSSION_URL: ${{ steps.discussion.outputs.url }}
         with:
           script: |
-            const issueNumber = ${{ steps.discussion.outputs.issue_number }};
-            const discussionUrl = '${{ steps.discussion.outputs.url }}';
+            const issueNumber = Number(process.env.ISSUE_NUMBER);
+            const discussionUrl = process.env.DISCUSSION_URL;
 
             const comment = `This feature request has been moved to [Discussions](${discussionUrl}) to keep bug reports separate from feature ideas.\n\nPlease continue the conversation there - we'd love to hear your thoughts!`;
 
@@ -104,10 +117,12 @@ jobs:
             console.log(`Added comment to issue #${issueNumber}`);
 
       - name: Close and lock issue
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          ISSUE_NUMBER: ${{ steps.discussion.outputs.issue_number }}
         with:
           script: |
-            const issueNumber = ${{ steps.discussion.outputs.issue_number }};
+            const issueNumber = Number(process.env.ISSUE_NUMBER);
 
             // Close the issue
             await github.rest.issues.update({

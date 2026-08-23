@@ -64,6 +64,36 @@ the following are missing or invalid in Docker:
 Local development can still use SQLite + `local-dev` auth bypass **outside
 Docker only**. Deployable mode must use the table above.
 
+### Database TLS
+
+The connection to Postgres follows libpq's `sslmode`, read from
+`CLAUDE_MEM_POSTGRES_SSL`, then `PGSSLMODE`, then the `sslmode` parameter in
+`CLAUDE_MEM_SERVER_DATABASE_URL`. The default is `prefer`.
+
+| `sslmode`     | Connection                                              |
+|---------------|---------------------------------------------------------|
+| `disable`, `allow`, `prefer` | Plaintext. `allow`/`prefer` cannot negotiate here — node-postgres fixes the transport before connecting — so they behave as plaintext. A non-local host logs a warning. |
+| `require`     | Encrypted, certificate **not** verified. Stops passive sniffing, not an active machine-in-the-middle. |
+| `verify-ca`   | Encrypted, certificate chain verified, hostname not.    |
+| `verify-full` | Encrypted, chain and hostname verified. **Use this in production.** |
+
+An unrecognised value fails at startup rather than falling back.
+
+For a private CA (RDS, an internal cluster), point
+`CLAUDE_MEM_POSTGRES_SSL_ROOT_CERT` — or `PGSSLROOTCERT`, or `sslrootcert` in
+the connection string — at the PEM bundle. Without one, the verify modes
+validate against the system trust store, which is what publicly-issued
+provider certificates need. A configured file that cannot be read fails at
+startup instead of silently falling back to the system store.
+
+> **Behaviour change.** `verify-ca` and `verify-full` previously fell through
+> an unrecognised-value path and produced a *plaintext* connection, so a
+> deployment set to `verify-full` was running unencrypted. They now do what
+> they say. If the database's certificate does not validate, the connection
+> now fails where it used to silently succeed — set
+> `CLAUDE_MEM_POSTGRES_SSL_ROOT_CERT`, or use `require` while the trust chain
+> is sorted out.
+
 ## Generation worker mode (`claude-mem server worker start`)
 
 The same image runs the generation worker via:

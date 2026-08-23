@@ -104,11 +104,31 @@ const OBS_PROMPT_FIELD_MAX_CHARS = 16_000;
 const OBS_PROMPT_FIELD_HEAD_RATIO = 0.6;
 const OBS_PROMPT_FIELD_TAIL_RATIO = 0.3;
 
+// Angle brackets are the ONLY characters that can terminate the surrounding
+// <parameters>/<outcome> element, and JSON.stringify does not escape them.
+// Tool output is attacker-reachable (a Read of a crafted file, a WebFetch
+// response, a command's stdout), so an unescaped "</outcome>" in a tool
+// result closes the block early and leaves the remainder of that output at
+// the top level of the observer prompt — where a forged <observation> block
+// would be parsed by parseObservationBlocks() and persisted as memory, then
+// replayed into future sessions via SessionStart additionalContext.
+//
+// \u003c / \u003e are valid JSON string escapes: JSON.parse() of the result
+// returns the original string byte-for-byte, so no information is lost. The
+// observer model still reads the content; it just cannot emit a literal
+// angle bracket into the prompt's element structure.
+function escapeJsonAngleBrackets(json: string): string {
+  return json.replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
+}
+
 function truncateObservationField(value: unknown, maxChars: number = OBS_PROMPT_FIELD_MAX_CHARS): string {
   // JSON.stringify returns undefined for undefined / functions / symbols;
   // fall back to empty string so the call sites (template literal output)
   // and the length check below stay well-defined.
-  const raw = JSON.stringify(value, null, 2) ?? '';
+  //
+  // Escaping happens BEFORE the length check so the budget is measured against
+  // the string that actually reaches the prompt.
+  const raw = escapeJsonAngleBrackets(JSON.stringify(value, null, 2) ?? '');
   if (raw.length <= maxChars) return raw;
   const headChars = Math.max(0, Math.floor(maxChars * OBS_PROMPT_FIELD_HEAD_RATIO));
   const tailChars = Math.max(0, Math.floor(maxChars * OBS_PROMPT_FIELD_TAIL_RATIO));

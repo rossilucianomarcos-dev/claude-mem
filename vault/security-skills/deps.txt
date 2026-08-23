@@ -1,0 +1,17 @@
+# skill: paquetes pypi que necesitan sus scripts (generado desde los imports)
+# Las marcadas [pesada] bajan cientos de MB la primera vez.
+analyzing-sbom-for-supply-chain-vulnerabilities: networkx packaging requests
+assessing-vector-and-embedding-weaknesses: qdrant-client scikit-learn sentence-transformers  # [pesada]
+auditing-mcp-servers-for-tool-poisoning: mcp
+conducting-api-security-testing: requests
+detecting-data-and-model-poisoning: art cleanlab numpy tensorflow  # [pesada]
+detecting-indirect-prompt-injection: beautifulsoup4 llm-guard pillow pypdf pytesseract transformers  # [pesada]
+detecting-supply-chain-attacks-in-ci-cd: pyyaml requests
+detecting-typosquatting-packages-in-npm-pypi: python-Levenshtein requests
+exploiting-insecure-deserialization: requests
+exploiting-prototype-pollution-in-javascript: requests
+exploiting-sql-injection-vulnerabilities: requests
+securing-agentic-ai-tool-invocation: jsonschema
+securing-github-actions-workflows: pyyaml
+testing-for-system-prompt-leakage: openai
+testing-prompt-injection-in-rag-pipelines: numpy requests sentence-transformers  # [pesada]

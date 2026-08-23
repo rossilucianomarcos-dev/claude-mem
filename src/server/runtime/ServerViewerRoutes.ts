@@ -16,6 +16,7 @@ import { existsSync, readFileSync } from 'fs';
 import type { RouteHandler } from '../../services/server/Server.js';
 import { getPackageRoot } from '../../shared/paths.js';
 import { logger } from '../../utils/logger.js';
+import { applyViewerSecurityHeaders } from '../../shared/viewer-security-headers.js';
 
 const VIEWER_HTML_CANDIDATE_PATHS: readonly string[] = (() => {
   const packageRoot = getPackageRoot();
@@ -49,10 +50,17 @@ export class ServerViewerRoutes implements RouteHandler {
     // Serve static assets from BOTH the npm-package `ui` dir and the plugin
     // `plugin/ui` dir, matching the worker's resolution order so the viewer
     // loads regardless of which layout the server image ships.
-    app.use(express.static(path.join(packageRoot, 'ui')));
-    app.use(express.static(path.join(packageRoot, 'plugin', 'ui')));
+    // Static assets carry the same headers as the document: nosniff matters
+    // for the bundle and the SVGs, which browsers will otherwise content-sniff.
+    const staticOptions = { setHeaders: applyViewerSecurityHeaders };
+    app.use(express.static(path.join(packageRoot, 'ui'), staticOptions));
+    app.use(express.static(path.join(packageRoot, 'plugin', 'ui'), staticOptions));
 
     app.get('/', (_req: Request, res: Response) => {
+      // Before the availability check: every response from this route carries
+      // the headers, including the 503, so the policy does not depend on
+      // whether a viewer.html happened to ship.
+      applyViewerSecurityHeaders(res);
       if (!viewerHtmlBytes) {
         res.status(503).json({ error: 'ViewerUnavailable', message: 'Viewer UI not found at any expected location' });
         return;

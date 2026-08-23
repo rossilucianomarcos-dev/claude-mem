@@ -23,13 +23,13 @@ const INSTALL_TIMEOUT_MS = (() => {
 export function platformBunRemediation(): string {
   return IS_WINDOWS
     ? 'Install Bun manually: `winget install Oven-sh.Bun` (or `powershell -c "irm bun.sh/install.ps1 | iex"`), then re-run `npx claude-mem install`.'
-    : 'Install Bun manually: `curl -fsSL https://bun.sh/install | bash` (or `brew install oven-sh/bun/bun`), then re-run `npx claude-mem install`.';
+    : 'Install Bun manually: `brew install oven-sh/bun/bun` (or `curl -fsSL https://bun.sh/install | bash`), then re-run `npx claude-mem install`.';
 }
 
 export function platformUvRemediation(): string {
   return IS_WINDOWS
     ? 'Install uv manually: `winget install astral-sh.uv` (or `powershell -c "irm https://astral.sh/uv/install.ps1 | iex"`), then re-run `npx claude-mem install`.'
-    : 'Install uv manually: `curl -LsSf https://astral.sh/uv/install.sh | sh` (or `brew install uv`), then re-run `npx claude-mem install`.';
+    : 'Install uv manually: `brew install uv` (or `curl -LsSf https://astral.sh/uv/install.sh | sh`), then re-run `npx claude-mem install`.';
 }
 
 function userHasOptedOutOfVectorSearch(): boolean {
@@ -156,80 +156,201 @@ function describeExecError(error: unknown): string {
   return String(error);
 }
 
-/** Run the platform-specific Bun installer, then confirm the binary is resolvable. */
-function runBunInstaller(): void {
-  if (IS_WINDOWS) {
-    execSync('powershell -c "irm bun.sh/install.ps1 | iex"', {
-      stdio: 'pipe',
-      timeout: INSTALL_TIMEOUT_MS,
-      shell: process.env.ComSpec ?? 'cmd.exe',
-    });
-  } else {
-    execSync('curl -fsSL https://bun.sh/install | bash', {
-      stdio: 'pipe',
-      timeout: INSTALL_TIMEOUT_MS,
-      shell: '/bin/bash',
-    });
-  }
+/**
+ * Runtime auto-install.
+ *
+ * THE PROBLEM THIS SHAPE SOLVES
+ * -----------------------------
+ * `npx claude-mem install` used to run `curl -fsSL https://bun.sh/install | bash`
+ * (and the astral.sh equivalent for uv) unattended: no prompt, no checksum, no
+ * signature, no version pin. The user asked to install claude-mem and got two
+ * pieces of remote code executed on their machine as a side effect. A
+ * compromise of either vendor domain — or of the TLS path to it — is arbitrary
+ * code execution during install.
+ *
+ * The scripts themselves cannot be pinned to a checksum: they are rolling
+ * installers whose contents change with every upstream release, so a pinned
+ * hash would break on the vendor's next publish rather than protect anything.
+ * What CAN be improved is the order of preference and the consent:
+ *
+ *   1. A package manager first, when one is present. winget and Homebrew
+ *      verify what they install; that is real verification, and it costs the
+ *      user nothing when the manager is already there.
+ *   2. The vendor script only as a fallback, and only with consent — an
+ *      interactive confirm, or an explicit opt-in for non-interactive runs.
+ *
+ * Note on the uv PowerShell line: `-ExecutionPolicy ByPass` looks like an extra
+ * weakening but is not meaningfully one — piping to `iex` already runs the
+ * script regardless of policy. It stays because dropping it breaks installs on
+ * machines with a restrictive policy while buying nothing.
+ */
 
-  if (!isBunInstalled()) {
-    throw new Error(
-      'Bun installation completed but binary not found. Please restart your terminal and try again.',
-    );
-  }
+/** Opt-in for non-interactive runs (CI, Docker builds, provisioning scripts). */
+export const REMOTE_INSTALL_OPT_IN = 'CLAUDE_MEM_ALLOW_REMOTE_RUNTIME_INSTALL';
+
+export interface RuntimeInstallSpec {
+  /** Display name used in prompts and errors. */
+  tool: string;
+  /** Package-manager attempts, tried in order and skipped when absent. */
+  packageManagers: { manager: string; command: string }[];
+  /** Vendor script fallback: unverified remote code, so it needs consent. */
+  remote: { url: string; command: string; shell: string };
+  /** Post-install check — the installer can exit 0 and still leave nothing usable. */
+  isInstalled: () => boolean;
+  /** Manual steps, shown when everything else is refused or fails. */
+  manualInstructions: string;
 }
 
-function installBun(): void {
-  try {
-    runBunInstaller();
-  } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    const manualInstructions = IS_WINDOWS
+export function bunSpec(): RuntimeInstallSpec {
+  return {
+    tool: 'Bun',
+    packageManagers: IS_WINDOWS
+      ? [{ manager: 'winget', command: 'winget install --silent --accept-package-agreements --accept-source-agreements Oven-sh.Bun' }]
+      : [{ manager: 'brew', command: 'brew install oven-sh/bun/bun' }],
+    remote: IS_WINDOWS
+      ? { url: 'https://bun.sh/install.ps1', command: 'powershell -c "irm bun.sh/install.ps1 | iex"', shell: process.env.ComSpec ?? 'cmd.exe' }
+      : { url: 'https://bun.sh/install', command: 'curl -fsSL https://bun.sh/install | bash', shell: '/bin/bash' },
+    isInstalled: isBunInstalled,
+    manualInstructions: IS_WINDOWS
       ? '  - winget install Oven-sh.Bun\n  - Or: powershell -c "irm bun.sh/install.ps1 | iex"'
-      : '  - curl -fsSL https://bun.sh/install | bash\n  - Or: brew install oven-sh/bun/bun';
-    throw new Error(
-      `Failed to install Bun. Please install manually:\n${manualInstructions}\nThen restart your terminal and try again.\n` +
-        `Underlying error: ${describeExecError(err)}`,
-    );
-  }
+      : '  - brew install oven-sh/bun/bun\n  - Or: curl -fsSL https://bun.sh/install | bash',
+  };
 }
 
-/** Run the platform-specific uv installer, then confirm the binary is resolvable. */
-function runUvInstaller(): void {
-  if (IS_WINDOWS) {
-    execSync('powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"', {
-      stdio: 'pipe',
-      timeout: INSTALL_TIMEOUT_MS,
-      shell: process.env.ComSpec ?? 'cmd.exe',
-    });
-  } else {
-    execSync('curl -LsSf https://astral.sh/uv/install.sh | sh', {
-      stdio: 'pipe',
-      timeout: INSTALL_TIMEOUT_MS,
-      shell: '/bin/bash',
-    });
-  }
-
-  if (!isUvInstalled()) {
-    throw new Error(
-      'uv installation completed but binary not found. Please restart your terminal and try again.',
-    );
-  }
+export function uvSpec(): RuntimeInstallSpec {
+  return {
+    tool: 'uv',
+    packageManagers: IS_WINDOWS
+      ? [{ manager: 'winget', command: 'winget install --silent --accept-package-agreements --accept-source-agreements astral-sh.uv' }]
+      : [{ manager: 'brew', command: 'brew install uv' }],
+    remote: IS_WINDOWS
+      ? { url: 'https://astral.sh/uv/install.ps1', command: 'powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"', shell: process.env.ComSpec ?? 'cmd.exe' }
+      : { url: 'https://astral.sh/uv/install.sh', command: 'curl -LsSf https://astral.sh/uv/install.sh | sh', shell: '/bin/bash' },
+    isInstalled: isUvInstalled,
+    manualInstructions: IS_WINDOWS
+      ? '  - winget install astral-sh.uv\n  - Or: powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"'
+      : '  - brew install uv\n  - Or: curl -LsSf https://astral.sh/uv/install.sh | sh',
+  };
 }
 
-function installUv(): void {
+/** Is this package manager callable? Absent is the normal case, not an error. */
+function hasPackageManager(manager: string): boolean {
   try {
-    runUvInstaller();
+    const command = IS_WINDOWS ? lookupWindowsCommand(manager) : manager;
+    if (!command) return false;
+    return spawnVersionProbe(command, ['--version']).status === 0;
+  } catch {
+    return false;
+  }
+}
+
+function runInstallCommand(command: string, shell: string): void {
+  execSync(command, { stdio: 'pipe', timeout: INSTALL_TIMEOUT_MS, shell });
+}
+
+/**
+ * Consent for executing a vendor script fetched at install time.
+ *
+ * Interactive: ask. Non-interactive: refuse unless the opt-in env var is set —
+ * a CI job silently executing remote code is exactly the case worth stopping,
+ * and the refusal names both the variable and the manual commands.
+ */
+async function consentToRemoteInstall(spec: RuntimeInstallSpec): Promise<boolean> {
+  if (process.env[REMOTE_INSTALL_OPT_IN] === '1') return true;
+  if (!process.stdin.isTTY) return false;
+
+  const p = await import('@clack/prompts');
+  p.log.warn(
+    `${spec.tool} is required and no package manager was available to install it.\n`
+    + `The fallback runs a script downloaded from ${spec.remote.url}:\n`
+    + `  ${spec.remote.command}\n`
+    + 'That executes code from the vendor with no checksum or signature to verify it.',
+  );
+  const answer = await p.confirm({
+    message: `Run the ${spec.tool} installer from ${new URL(spec.remote.url).host}?`,
+    initialValue: false,
+  });
+  return !p.isCancel(answer) && answer === true;
+}
+
+/**
+ * Seams for tests: this function's whole job is deciding what to execute and
+ * whether consent was given, and neither is observable if it really installs a
+ * runtime. Production passes nothing and gets the real implementations.
+ */
+export interface RuntimeInstallDependencies {
+  hasPackageManager: (manager: string) => boolean;
+  run: (command: string, shell: string) => void;
+  consent: (spec: RuntimeInstallSpec) => Promise<boolean>;
+  isInteractive: () => boolean;
+}
+
+function defaultInstallDependencies(): RuntimeInstallDependencies {
+  return {
+    hasPackageManager,
+    run: runInstallCommand,
+    consent: consentToRemoteInstall,
+    isInteractive: () => Boolean(process.stdin.isTTY),
+  };
+}
+
+/**
+ * Install one runtime: package manager first, vendor script second and only
+ * with consent. Throws with manual instructions when nothing succeeded.
+ */
+export async function installRuntime(
+  spec: RuntimeInstallSpec,
+  dependencies: RuntimeInstallDependencies = defaultInstallDependencies(),
+): Promise<void> {
+  const attempts: string[] = [];
+
+  for (const { manager, command } of spec.packageManagers) {
+    if (!dependencies.hasPackageManager(manager)) continue;
+    try {
+      dependencies.run(command, IS_WINDOWS ? (process.env.ComSpec ?? 'cmd.exe') : '/bin/sh');
+      if (spec.isInstalled()) return;
+      attempts.push(`${manager}: completed but ${spec.tool} was still not found`);
+    } catch (error) {
+      // A package manager that fails is not fatal — fall through to the script.
+      attempts.push(`${manager}: ${describeExecError(error)}`);
+    }
+  }
+
+  if (!(await dependencies.consent(spec))) {
+    const why = dependencies.isInteractive()
+      ? `Declined running the ${spec.tool} installer from ${spec.remote.url}.`
+      : `Refusing to run the ${spec.tool} installer from ${spec.remote.url} in a non-interactive shell.`;
+    throw new Error(
+      `${why}\nInstall ${spec.tool} yourself:\n${spec.manualInstructions}\n`
+      + `Or, to allow the download for automated runs, set ${REMOTE_INSTALL_OPT_IN}=1.\n`
+      + 'Then re-run `npx claude-mem install`.'
+      + (attempts.length ? `\nEarlier attempts: ${attempts.join('; ')}` : ''),
+    );
+  }
+
+  try {
+    dependencies.run(spec.remote.command, spec.remote.shell);
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    const manualInstructions = IS_WINDOWS
-      ? '  - winget install astral-sh.uv\n  - Or: powershell -c "irm https://astral.sh/uv/install.ps1 | iex"'
-      : '  - curl -LsSf https://astral.sh/uv/install.sh | sh\n  - Or: brew install uv (macOS)';
     throw new Error(
-      `Failed to install uv. Please install manually:\n${manualInstructions}\nThen restart your terminal and try again.\n` +
-        `Underlying error: ${describeExecError(err)}`,
+      `Failed to install ${spec.tool}. Please install manually:\n${spec.manualInstructions}\n`
+      + `Then restart your terminal and try again.\nUnderlying error: ${describeExecError(err)}`,
     );
   }
+
+  if (!spec.isInstalled()) {
+    throw new Error(
+      `${spec.tool} installation completed but binary not found. Please restart your terminal and try again.`,
+    );
+  }
+}
+
+function installBun(): Promise<void> {
+  return installRuntime(bunSpec());
+}
+
+function installUv(): Promise<void> {
+  return installRuntime(uvSpec());
 }
 
 /**
@@ -311,7 +432,7 @@ export async function ensureBun(summary?: InstallSummary): Promise<{ bunPath: st
     // the central decision point so it becomes a loud ABORT (bun is mandatory
     // for hooks — there is no opt-out).
     try {
-      installBun();
+      await installBun();
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       // installerError(ABORT) reports the cause loudly and always throws.
@@ -362,7 +483,7 @@ export async function ensureUv(
   const sum = summaryOrEphemeral(summary);
   if (!isUvInstalled()) {
     try {
-      installUv();
+      await installUv();
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       if (options.allowVectorSearchOptOut && userHasOptedOutOfVectorSearch()) {

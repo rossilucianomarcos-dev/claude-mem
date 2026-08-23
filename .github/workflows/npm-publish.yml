@@ -5,17 +5,33 @@ on:
     tags:
       - 'v*'
 
+# Deny by default; each job opts into exactly what it needs. Without this the
+# workflow inherits the repository default, which may be read/write on every
+# scope for a job that holds NPM_TOKEN.
+permissions: {}
+
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Only the checkout needs the token. Publishing authenticates to npm with
+    # NPM_TOKEN, not GITHUB_TOKEN.
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # Actions are pinned to immutable SHA digests: a mutable tag can be
+      # repointed by whoever controls the upstream repo, and any action in this
+      # job runs before `npm publish` — so it could rewrite dist/ and ship
+      # malware under this package's name. The trailing comment records the
+      # release each digest corresponds to. Enabling Dependabot for the
+      # github-actions ecosystem will keep these digests updated; without it
+      # they must be bumped by hand.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
       - name: Install Bun (required by smoke:clean-room)
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: latest
       - run: npm install --ignore-scripts

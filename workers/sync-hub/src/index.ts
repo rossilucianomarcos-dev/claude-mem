@@ -812,8 +812,9 @@ function decimalAtLeast(left: string, right: string): boolean {
 }
 
 async function handleRepairDrain(request: Request, env: Env): Promise<Response> {
-	const expected = `Bearer ${env.CMEM_INTERNAL_PROJECTOR_SECRET ?? ""}`;
-	if (!env.CMEM_INTERNAL_PROJECTOR_SECRET || request.headers.get("Authorization") !== expected) {
+	// Through the shared helper, like the other three /internal routes: one
+	// implementation to harden, so tightening it cannot leave this route behind.
+	if (!hasInternalCredential(request, env)) {
 		return errorResponse(401, "invalid internal projector credential");
 	}
 	let body: unknown;
@@ -850,6 +851,51 @@ async function handleRepairDrain(request: Request, env: Env): Promise<Response> 
 		head_seq: finalState.head_seq,
 		projected_through_seq: finalState.projected_seq,
 	});
+}
+
+/**
+ * Pre-auth request ceiling, keyed by the client IP.
+ *
+ * WHY HERE, AND WHY BY IP
+ * -----------------------
+ * Verdict caching is positive-only and deliberately so: caching negatives
+ * would wrongly reject a token issued seconds ago. The cost is that every
+ * request carrying a BAD token misses the cache and reaches TOKEN_VERIFY_URL,
+ * so someone holding no valid credential at all can turn each of their
+ * requests into one request against cmem.ai. This runs BEFORE
+ * authenticateRequest so the ceiling applies to exactly the traffic that
+ * would otherwise be amplified.
+ *
+ * The key is the IP because the alternatives are attacker-chosen: the bearer
+ * token and X-User-Id are both supplied by the caller and can be rotated per
+ * request, which would let an attacker mint a fresh bucket every time. The IP
+ * can be shared (NAT), which is why the limit carries headroom for several
+ * devices rather than being tuned to one.
+ *
+ * Absent binding or absent IP means no limiting — that is local dev and the
+ * test runner, where neither exists. A limiter that throws also lets the
+ * request through: an outage in the counter must not take sync down with it,
+ * which matches how the Server Beta guards behave (docs/api.md).
+ */
+async function enforceIpRateLimit(request: Request, env: Env): Promise<Response | null> {
+	const limiter = env.SYNC_RATE_LIMITER;
+	const ip = request.headers.get("CF-Connecting-IP");
+	if (!limiter || !ip) return null;
+	let allowed = true;
+	try {
+		({ success: allowed } = await limiter.limit({ key: ip }));
+	} catch (error) {
+		console.warn("sync-hub rate limit check failed; allowing request (fail open):", {
+			errorName: error instanceof Error ? error.name : "unknown",
+		});
+		return null;
+	}
+	if (allowed) return null;
+	const refusal = errorResponse(429, "too many requests");
+	// The window is fixed at 60s in wrangler.jsonc; a client that honours this
+	// backs off instead of spinning.
+	refusal.headers.set("Retry-After", "60");
+	return refusal;
 }
 
 export default {
@@ -892,6 +938,14 @@ export default {
 		// (everything 401/503ing) must still tell clients "poll" — an
 		// unstamped error response must never read as "switch cleared".
 		const killSwitch = await readKillSwitch(env);
+
+		// Before authenticateRequest: this bounds the requests that would
+		// otherwise each cost one upstream token verification.
+		const limited = await enforceIpRateLimit(request, env);
+		if (limited) {
+			if (killSwitch.tripped) limited.headers.set(SYNC_MODE_HEADER, SYNC_MODE_POLL);
+			return limited;
+		}
 
 		const auth = await authenticateRequest(request, env);
 		if (!auth.ok) {

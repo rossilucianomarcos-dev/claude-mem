@@ -1278,3 +1278,132 @@ describe("per-user device admission bound", () => {
 		expect(state.devices.some((device) => device.device_id === "unknown-rename")).toBe(false);
 	});
 });
+
+// Routing already binds a hub to one user: the front Worker addresses it with
+// getByName(userId) after verifying that id against the token's canonical
+// owner. These tests cover the second line — the hub enforcing the binding
+// itself, so a caller that addresses one hub and names another is refused
+// instead of getting this hub's data under the other id.
+describe("user id binding", () => {
+	it("pins the user id on first use and accepts it again", async () => {
+		const stub = hub("bind-happy");
+
+		const first = await stub.getMetadata("user-a");
+		expect(first.user_id).toBe("user-a");
+
+		await runInDurableObject(stub, (_instance: SyncHub, state) => {
+			const row = state.storage.sql
+				.exec<{ v: string }>("SELECT v FROM meta WHERE k = 'user_id'")
+				.one();
+			expect(row.v).toBe("user-a");
+		});
+
+		const second = await stub.getMetadata("user-a");
+		expect(second.user_id).toBe("user-a");
+	});
+
+	// Called on the instance rather than through the RPC stub: a stub rejection
+	// is also surfaced by the RPC layer, which vitest reports as an unhandled
+	// error and warns can mask real failures.
+	it("refuses a different user id once pinned", async () => {
+		const stub = hub("bind-mismatch");
+		await stub.getMetadata("user-a");
+
+		await runInDurableObject(stub, (instance: SyncHub) => {
+			expect(() => instance.getMetadata("user-b")).toThrow(
+				/user_id does not match this hub's bound identity/,
+			);
+		});
+	});
+
+	it("still rejects an empty user id", async () => {
+		const stub = hub("bind-empty");
+		await runInDurableObject(stub, (instance: SyncHub) => {
+			expect(() => instance.getMetadata("")).toThrow(/user_id must be non-empty/);
+		});
+	});
+
+	// The pin is lazy because the write path never learns the id — pushOps takes
+	// no user id, the DO name IS the user id. A hub created before this change
+	// has data but no pin, and must adopt the first id it is given rather than
+	// refuse every call.
+	it("adopts an id on a hub that already holds ops but no pin", async () => {
+		const stub = hub("bind-backfill");
+		await stub.pushOps("device-a", [await observationOp("1", "1", "device-a")], null);
+
+		await runInDurableObject(stub, (_instance: SyncHub, state) => {
+			state.storage.sql.exec("DELETE FROM meta WHERE k = 'user_id'");
+		});
+
+		const metadata = await stub.getMetadata("user-late");
+		expect(metadata.user_id).toBe("user-late");
+		// The pushed op survived the backfill: adopting an id must not disturb data.
+		expect(metadata.head_seq).toBe("1");
+	});
+
+	// resetAllState()'s deleteAll() clears the pin with the data; a wiped hub is
+	// legitimately re-bound by whoever addresses it next.
+	it("clears the pin on reset so the hub can be re-bound", async () => {
+		const stub = hub("bind-reset");
+		await stub.getMetadata("user-a");
+		await stub.resetAllState();
+
+		const metadata = await stub.getMetadata("user-b");
+		expect(metadata.user_id).toBe("user-b");
+	});
+});
+
+// The four /internal routes are matched before the subscriber auth path, so
+// each one carries its own credential check. handleRepairDrain used to
+// reimplement that check inline instead of calling hasInternalCredential;
+// these cases pin the behaviour for all four so a future divergence — or a
+// tightening that misses one route — fails here.
+describe("internal routes reject bad credentials", () => {
+	const base = "https://sync-hub.test";
+	const routes = [
+		"/internal/v1/projection/drain",
+		"/internal/v1/sync/metadata",
+		"/internal/v1/sync/device-name",
+		"/internal/v1/sync/reset",
+	];
+	const userId = "88888888-8888-4888-8888-888888888888";
+	const body = JSON.stringify({ protocol_version: 1, user_id: userId });
+
+	for (const route of routes) {
+		it(`refuses ${route} without a credential`, async () => {
+			const response = await SELF.fetch(`${base}${route}`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body,
+			});
+			expect(response.status).toBe(401);
+		});
+
+		it(`refuses ${route} with the wrong credential`, async () => {
+			const response = await SELF.fetch(`${base}${route}`, {
+				method: "POST",
+				headers: {
+					Authorization: "Bearer not-the-projector-secret",
+					"Content-Type": "application/json",
+				},
+				body,
+			});
+			expect(response.status).toBe(401);
+		});
+
+		// A subscriber bearer token must not open an internal route: these
+		// bypass authenticateRequest entirely and answer only to the shared secret.
+		it(`refuses ${route} with a subscriber token`, async () => {
+			const response = await SELF.fetch(`${base}${route}`, {
+				method: "POST",
+				headers: {
+					Authorization: "Bearer test-token",
+					"X-User-Id": userId,
+					"Content-Type": "application/json",
+				},
+				body,
+			});
+			expect(response.status).toBe(401);
+		});
+	}
+});
