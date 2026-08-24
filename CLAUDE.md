@@ -51,6 +51,28 @@ scans the stack and pulls in the right sub-skills itself.
 See `vault/design-skills/README.md` for the full inventory, pinned upstream
 commits, and how to update.
 
+## Internet Access Skill
+
+`agent-reach` is vendored in `vault/agent-reach/` (source of truth, committed) and
+installed into `.claude/skills/` by `vault/agent-reach/install.sh --cli`. Same
+deal as the design skills: the install directory is gitignored, so re-run the
+script after a fresh clone.
+
+Reach for it automatically, without being asked, whenever the work needs
+content from the internet: researching a topic across the web, reading a URL,
+YouTube transcripts, RSS feeds, GitHub code search, or anything on Twitter/X,
+Reddit, Facebook, Instagram, LinkedIn, V2EX, Bilibili, XiaoHongShu, Xueqiu, or
+XiaoYuZhou. Start with `agent-reach doctor --json` to see which backend is live
+for the platform you need, and say which platform and backend you're using
+before you start.
+
+Not for content processing (writing, analysis, translation) or write actions
+(posting, commenting) — it only fetches. Temporary files go in `/tmp/`,
+persistent data in `~/.agent-reach/`, never in the project directory.
+
+See `vault/agent-reach/README.md` for channel setup, the pinned upstream commit,
+and how to update.
+
 ## Important
 
 No need to edit the changelog ever, it's generated automatically.
